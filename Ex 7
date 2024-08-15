@@ -1,0 +1,60 @@
+import numpy as np
+import pandas as pd
+
+# Generate synthetic data
+np.random.seed(42)
+class1 = np.random.multivariate_normal([2, 2], [[1, 0.5], [0.5, 1]], 50)
+class2 = np.random.multivariate_normal([5, 5], [[1, 0.5], [0.5, 1]], 50)
+
+# Combine the data
+X = np.vstack((class1, class2))
+y = np.hstack((np.zeros(50), np.ones(50)))
+
+# Compute the mean vectors for each class
+mean_vecs = []
+for cl in [0, 1]:
+    mean_vecs.append(np.mean(X[y == cl], axis=0))
+mean_overall = np.mean(X, axis=0)
+
+# Compute the within-class scatter matrix (Sw)
+Sw = np.zeros((2, 2))
+for cl, mv in zip([0, 1], mean_vecs):
+    class_sc_mat = np.zeros((2, 2))
+    for row in X[y == cl]:
+        row, mv = row.reshape(2, 1), mv.reshape(2, 1)
+        class_sc_mat += (row - mv).dot((row - mv).T)
+    Sw += class_sc_mat
+
+print(f"Within-class scatter matrix Sw:\n{Sw}\n")
+
+# Compute the between-class scatter matrix (Sb)
+Sb = np.zeros((2, 2))
+for i, mean_vec in enumerate(mean_vecs):
+    n = X[y == i, :].shape[0]
+    mean_vec = mean_vec.reshape(2, 1)  # Make column vector
+    mean_overall = mean_overall.reshape(2, 1)
+    Sb += n * (mean_vec - mean_overall).dot((mean_vec - mean_overall).T)
+
+print(f"Between-class scatter matrix Sb:\n{Sb}\n")
+
+# Compute the eigenvalues and eigenvectors
+eigen_values, eigen_vectors = np.linalg.eig(np.linalg.inv(Sw).dot(Sb))
+
+print("Eigenvalues:\n", eigen_values)
+print("Eigenvectors:\n", eigen_vectors)
+
+# Sort the eigenvectors by eigenvalues in descending order
+eigen_pairs = [(np.abs(eigen_values[i]), eigen_vectors[:, i]) for i in range(len(eigen_values))]
+eigen_pairs = sorted(eigen_pairs, key=lambda k: k[0], reverse=True)
+
+print("\nEigenvalues in descending order:")
+for eigen_val in eigen_pairs:
+    print(eigen_val[0])
+
+# Select the top k eigenvectors (k = 1 for 1D projection)
+W = np.hstack((eigen_pairs[0][1].reshape(2, 1), eigen_pairs[1][1].reshape(2, 1)))
+print("\nMatrix W (selected eigenvectors):\n", W)
+
+# Transform the original dataset
+X_lda = X.dot(W)
+print("\nTransformed LDA dataset:\n", X_lda)
